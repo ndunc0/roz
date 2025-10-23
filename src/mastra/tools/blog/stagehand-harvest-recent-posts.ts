@@ -98,7 +98,7 @@ const getRecentPosts = async ({
   console.info("Extracting blog posts...");
   const { blogPostsData } = await page.extract({
     instruction:
-      "Extract all blog posts including featured post with the publication dates and url link to each post",
+      "Extract all blog post information including the publication date, title, and url link of each post.",
     schema: z.object({
       blogPostsData: z.array(
         z.object({
@@ -108,22 +108,24 @@ const getRecentPosts = async ({
         })
       ),
     }),
-    selector: blogPosts.selector,
   });
 
   // 3) Filter and visit posts from last [windowDays] days
   let totalHarvested = 0;
   let olderStreak = 0;
   for (const post of blogPostsData) {
+    console.log(`post: ${JSON.stringify(post)}`);
     console.log("top of loop");
 
     const postDate = post.date ? new Date(post.date) : null;
 
     if (postDate === null || postDate >= windowDaysAgo) {
-      console.log(`Visiting recent post: ${post.title} (${post.date})`);
+      console.log(
+        `Visiting recent post: ${post.title} (${post.date}, ${post.url})`
+      );
 
       // Click the post link
-      await page.act(`Click the link to "${post.title}"`);
+      await page.act(`Click the link to ${post.title}`);
 
       // Wait for navigation
       await page.waitForLoadState("networkidle");
