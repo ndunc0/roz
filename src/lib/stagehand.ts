@@ -3,7 +3,7 @@
 import { Stagehand } from "@browserbasehq/stagehand";
 
 const MODEL_OPTIONS = {
-  modelName: "google/gemini-2.5-flash-lite",
+  modelName: "google/gemini-2.5-flash",
   modelClientOptions: {
     apiKey: process.env.GOOGLE_GENERATIVE_AI_API_KEY,
   },

@@ -30,6 +30,7 @@
  * ```
  */
 
+import { Page } from "@browserbasehq/stagehand";
 import { sessionManager } from "@lib/stagehand";
 import { createTool } from "@mastra/core";
 import { z } from "zod/v3";
@@ -72,6 +73,7 @@ const getRecentPosts = async ({
   olderStreakToStop,
 }: z.infer<typeof BlogSearchInputSchema>) => {
   const posts: z.infer<typeof PostDataSchema>[] = [];
+  let overallHarvested = 0;
 
   // Get date from [windowDays] days ago for comparison
   const windowDaysAgo = new Date();
@@ -89,12 +91,69 @@ const getRecentPosts = async ({
 
   // 1) Find all blog post elements for future interaction
   console.info("Observing...");
-  const [blogPosts] = await page.observe({
-    instruction:
-      "Find all clickable blog post elements including featured posts",
-  });
+  // const [blogPosts] = await page.observe({
+  //   instruction:
+  //     "Find all clickable blog post elements including featured posts",
+  // });
 
-  // 2) Extract URLs, titles, and publication dates from observed posts
+  // 1) Check for relevant tabs to navigate to (e.g., "Product Updates", "Company News")
+  // If there are no tabs, proceed without navigation. If there are tabs, loop through them.
+  const highPotentialTabs = await page.observe(
+    "Find navigation tabs that would lead to a specific blog post category that would likely contain posts relevant to product updates, company updates, team updates, or other company-focused news as opposed to random thoughtpieces. (e.g. 'Company', 'Product Updates')."
+  );
+
+  console.log(`Found ${highPotentialTabs.length} high-potential tabs.`);
+
+  // 2) Extract posts from the main blog page or from each relevant tab
+  if (highPotentialTabs.length === 0) {
+    console.info("Proceeding without tab navigation.");
+    // Proceed without tab navigation
+    const newPosts = await harvestPosts(
+      page,
+      windowDaysAgo,
+      olderStreakToStop,
+      maxPosts - overallHarvested
+    );
+
+    posts.push(...newPosts);
+    overallHarvested += posts.length;
+  } else {
+    for (let i = 0; i < highPotentialTabs.length; i++) {
+      await page.act(`Click on the ${highPotentialTabs[i].selector} tab`);
+
+      const newPosts = await harvestPosts(
+        page,
+        windowDaysAgo,
+        olderStreakToStop,
+        maxPosts - overallHarvested
+      );
+
+      posts.push(...newPosts);
+      overallHarvested += posts.length;
+
+      if (overallHarvested >= maxPosts) {
+        console.log(`Reached max harvested posts of ${maxPosts}, stopping.`);
+        break;
+      }
+    }
+  }
+
+  console.log("Finished processing recent blog posts");
+
+  await stagehand.close();
+  return { sessionUrl, posts };
+};
+
+async function harvestPosts(
+  page: Page,
+  windowDaysAgo: Date,
+  olderStreakToStop: number,
+  maxPosts: number
+) {
+  const posts: z.infer<typeof PostDataSchema>[] = [];
+  let totalHarvested = 0;
+  let olderStreak = 0;
+
   console.info("Extracting blog posts...");
   const { blogPostsData } = await page.extract({
     instruction:
@@ -110,9 +169,6 @@ const getRecentPosts = async ({
     }),
   });
 
-  // 3) Filter and visit posts from last [windowDays] days
-  let totalHarvested = 0;
-  let olderStreak = 0;
   for (const post of blogPostsData) {
     console.log(`post: ${JSON.stringify(post)}`);
     console.log("top of loop");
@@ -135,7 +191,8 @@ const getRecentPosts = async ({
       if (postDate) {
         console.log(`Extracting content from ${post.title}`);
         const { content } = await page.extract({
-          instruction: "Extract the main text content of the blog post",
+          instruction:
+            "Extract the main text content of the blog post and the publication date. Ignore headers, footers, and ads.",
           schema: z.object({
             content: z
               .string()
@@ -160,7 +217,7 @@ const getRecentPosts = async ({
         console.log(`Extracting content from ${post.title}`);
         const { content, publishedDateString } = await page.extract({
           instruction:
-            "Extract the main text content of the blog post and the publication date",
+            "Extract the main text content of the blog post and the publication date. Ignore headers, footers, and ads.",
           schema: z.object({
             content: z
               .string()
@@ -198,24 +255,15 @@ const getRecentPosts = async ({
           totalHarvested++;
         }
 
+        if (totalHarvested >= maxPosts) {
+          console.log(`Reached max harvested posts of ${maxPosts}, stopping.`);
+          break;
+        }
+
         console.log(`Content of "${post.title}":\n${content}\n---\n`);
       }
-
-      if (totalHarvested >= maxPosts) {
-        console.log(`Reached max harvested posts of ${maxPosts}, stopping.`);
-        break;
-      }
-
-      // Go back for next post
-      await page.goBack();
-
-      // Wait for main page to load
-      await page.waitForLoadState("networkidle");
     }
   }
 
-  console.log("Finished processing recent blog posts");
-
-  await stagehand.close();
-  return { sessionUrl, posts };
-};
+  return posts;
+}
