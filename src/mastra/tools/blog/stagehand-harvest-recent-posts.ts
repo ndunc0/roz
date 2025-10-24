@@ -43,7 +43,6 @@ const BlogSearchInputSchema = z.object({
 });
 
 const PostDataSchema = z.object({
-  url: z.string().url(),
   canonicalUrl: z.string().url(),
   title: z.string(),
   author: z.string().optional(), // unused for now
@@ -51,6 +50,13 @@ const PostDataSchema = z.object({
   publishedAtText: z.string().optional(),
   content: z.string(),
 });
+
+type LinkItem = {
+  url: string;
+  tabId: number;
+  seq: number; // position within that tab
+  postDate?: number | null; // +new Date(...), or null/undefined if unknown
+};
 
 export const stagehandHarvestRecentPostsTool = createTool({
   id: "stagehand-harvest-recent-posts",
@@ -74,6 +80,7 @@ const getRecentPosts = async ({
 }: z.infer<typeof BlogSearchInputSchema>) => {
   const posts: z.infer<typeof PostDataSchema>[] = [];
   let overallHarvested = 0;
+  let olderStreak = 0;
 
   // Get date from [windowDays] days ago for comparison
   const windowDaysAgo = new Date();
@@ -89,13 +96,7 @@ const getRecentPosts = async ({
 
   await page.goto(blogUrl);
 
-  // 1) Find all blog post elements for future interaction
   console.info("Observing...");
-  // const [blogPosts] = await page.observe({
-  //   instruction:
-  //     "Find all clickable blog post elements including featured posts",
-  // });
-
   // 1) Check for relevant tabs to navigate to (e.g., "Product Updates", "Company News")
   // If there are no tabs, proceed without navigation. If there are tabs, loop through them.
   const highPotentialTabs = await page.observe(
@@ -104,35 +105,57 @@ const getRecentPosts = async ({
 
   console.log(`Found ${highPotentialTabs.length} high-potential tabs.`);
 
-  // 2) Extract posts from the main blog page or from each relevant tab
+  // 2) For each tab, extract links to the first N [maxPosts] blog posts
+  const allPostPreviewData: LinkItem[] = [];
   if (highPotentialTabs.length === 0) {
     console.info("Proceeding without tab navigation.");
-    // Proceed without tab navigation
-    const newPosts = await harvestPosts(
+
+    const postPreviewData = await extractPostLinks(
       page,
-      windowDaysAgo,
-      olderStreakToStop,
-      maxPosts - overallHarvested
+      -1,
+      maxPosts + windowDays
     );
 
-    posts.push(...newPosts);
-    overallHarvested += posts.length;
+    console.log(`data without tabs:`, postPreviewData);
+
+    allPostPreviewData.push(...postPreviewData);
   } else {
     for (let i = 0; i < highPotentialTabs.length; i++) {
       await page.act(`Click on the ${highPotentialTabs[i].selector} tab`);
 
-      const newPosts = await harvestPosts(
+      const tabPostPreviewData = await extractPostLinks(
         page,
-        windowDaysAgo,
-        olderStreakToStop,
-        maxPosts - overallHarvested
+        i,
+        maxPosts + windowDays
       );
 
-      posts.push(...newPosts);
-      overallHarvested += posts.length;
+      console.log(`data from tab ${i}:`, tabPostPreviewData);
 
-      if (overallHarvested >= maxPosts) {
-        console.log(`Reached max harvested posts of ${maxPosts}, stopping.`);
+      allPostPreviewData.push(...tabPostPreviewData);
+    }
+  }
+
+  // 3) Merge all extracted links into a single list, sorted by date (newest first)
+  const mergedLinks = sortAndDedupe(allPostPreviewData);
+
+  console.log(`filtered merged links:`, mergedLinks);
+
+  // 4) Visit each link in order, harvesting posts until limits are reached
+  for (const linkItem of mergedLinks) {
+    console.info(`Navigating to blog post: ${linkItem.url}`);
+    await page.goto(linkItem.url, { waitUntil: "domcontentloaded" });
+    const post = await harvestPost(page, windowDaysAgo);
+
+    if (post) {
+      posts.push(post);
+      overallHarvested++;
+      olderStreak = 0; // reset streak
+    } else {
+      olderStreak++;
+      if (olderStreak >= olderStreakToStop) {
+        console.log(
+          `Encountered ${olderStreak} older posts in a row, stopping harvest.`
+        );
         break;
       }
     }
@@ -144,126 +167,98 @@ const getRecentPosts = async ({
   return { sessionUrl, posts };
 };
 
-async function harvestPosts(
+async function extractPostLinks(
   page: Page,
-  windowDaysAgo: Date,
-  olderStreakToStop: number,
-  maxPosts: number
-) {
-  const posts: z.infer<typeof PostDataSchema>[] = [];
-  let totalHarvested = 0;
-  let olderStreak = 0;
-
-  console.info("Extracting blog posts...");
-  const { blogPostsData } = await page.extract({
-    instruction:
-      "Extract all blog post information including the publication date, title, and url link of each post.",
+  tabId: number,
+  numPostsToExtract: number
+): Promise<LinkItem[]> {
+  const { postPreviewData } = await page.extract({
+    instruction: `Extract the first ${numPostsToExtract} blog post links on the current page and their publication dates if available.`,
     schema: z.object({
-      blogPostsData: z.array(
+      postPreviewData: z.array(
         z.object({
-          url: z.string().url().describe("The link to the blog post"),
-          date: z.string().optional().describe("Publication date"),
-          title: z.string().describe("Post title"),
+          url: z
+            .string()
+            .url()
+            .describe("The URL to navigate to the blog post"),
+          date: z
+            .string()
+            .optional()
+            .describe("The publication date listed on the post element"),
         })
       ),
     }),
   });
 
-  for (const post of blogPostsData) {
-    console.log(`post: ${JSON.stringify(post)}`);
-    console.log("top of loop");
+  return postPreviewData.map((item, seq) => ({
+    url: item.url,
+    tabId,
+    seq,
+    postDate: item.date ? +new Date(item.date) : null,
+  }));
+}
 
-    const postDate = post.date ? new Date(post.date) : null;
+async function harvestPost(
+  page: Page,
+  windowDaysAgo: Date
+): Promise<z.infer<typeof PostDataSchema> | null> {
+  const post = await page.extract({
+    instruction:
+      "Extract the blog post's title, publication date, and main text content. Ignore headers, footers, and ads.",
+    schema: z.object({
+      date: z.string().optional().describe("Publication date"),
+      title: z.string().describe("Post title"),
+      content: z.string().describe("The main text content of the blog post"),
+    }),
+  });
 
-    if (postDate === null || postDate >= windowDaysAgo) {
-      console.log(
-        `Visiting recent post: ${post.title} (${post.date}, ${post.url})`
-      );
+  console.log(`Captured post: ${post.title} from ${post.date}`);
 
-      // Click the post link
-      await page.act(`Click the link to ${post.title}`);
+  const postDate = post.date ? new Date(post.date) : null;
 
-      // Wait for navigation
-      await page.waitForLoadState("networkidle");
+  if (!postDate || postDate < windowDaysAgo) {
+    return null;
+  } else {
+    return {
+      canonicalUrl: page.url(),
+      title: post.title,
+      content: post.content,
+      publishedAtISO: postDate ? postDate.toISOString() : undefined,
+      publishedAtText: post.date,
+    };
+  }
+}
 
-      // If the postDate was null, we need to extract the date from the blog post itself
-      // Then, if the post is outside of the week, we break the loop
-      if (postDate) {
-        console.log(`Extracting content from ${post.title}`);
-        const { content } = await page.extract({
-          instruction:
-            "Extract the main text content of the blog post and the publication date. Ignore headers, footers, and ads.",
-          schema: z.object({
-            content: z
-              .string()
-              .describe("The main text content of the blog post"),
-          }),
-        });
+function sortAndDedupe(unsorted: LinkItem[]): LinkItem[] {
+  const hasDate = (x: unknown): x is number =>
+    typeof x === "number" && Number.isFinite(x);
 
-        posts.push({
-          url: post.url,
-          canonicalUrl: page.url(),
-          title: post.title,
-          content,
-          publishedAtISO: post.date
-            ? new Date(post.date).toISOString()
-            : undefined,
-          publishedAtText: post.date,
-        });
-        totalHarvested++;
+  function cmp(a: LinkItem, b: LinkItem): number {
+    const aHas = hasDate(a.postDate);
+    const bHas = hasDate(b.postDate);
 
-        console.log(`Content of "${post.title}":\n${content}\n---\n`);
-      } else {
-        console.log(`Extracting content from ${post.title}`);
-        const { content, publishedDateString } = await page.extract({
-          instruction:
-            "Extract the main text content of the blog post and the publication date. Ignore headers, footers, and ads.",
-          schema: z.object({
-            content: z
-              .string()
-              .describe("The main text content of the blog post"),
-            publishedDateString: z.string().describe("The Publication Date"),
-          }),
-        });
-
-        const publishedDate = publishedDateString
-          ? new Date(publishedDateString)
-          : null;
-
-        if (!publishedDate || publishedDate < windowDaysAgo) {
-          olderStreak++;
-          if (olderStreak >= olderStreakToStop) {
-            console.log(
-              `Encountered ${olderStreak} older posts in a row, stopping harvest.`
-            );
-
-            break;
-          }
-        } else {
-          olderStreak = 0; // reset streak
-
-          posts.push({
-            url: post.url,
-            canonicalUrl: page.url(),
-            title: post.title,
-            content,
-            publishedAtISO: publishedDate
-              ? publishedDate.toISOString()
-              : undefined,
-            publishedAtText: publishedDateString,
-          });
-          totalHarvested++;
-        }
-
-        if (totalHarvested >= maxPosts) {
-          console.log(`Reached max harvested posts of ${maxPosts}, stopping.`);
-          break;
-        }
-
-        console.log(`Content of "${post.title}":\n${content}\n---\n`);
-      }
+    // newest first
+    if (aHas && bHas && a.postDate! !== b.postDate!) {
+      return b.postDate! - a.postDate!;
     }
+
+    if (a.seq !== b.seq) return a.seq - b.seq; // tie #1
+
+    if (a.tabId !== b.tabId) return a.tabId < b.tabId ? -1 : 1; // tie #2
+
+    if (a.url !== b.url) return a.url < b.url ? -1 : 1; // final fallback
+
+    return 0;
   }
 
-  return posts;
+  const sorted = unsorted.sort(cmp);
+  const seen = new Set<string>();
+  const out: LinkItem[] = [];
+  for (const it of sorted) {
+    if (!seen.has(it.url)) {
+      seen.add(it.url);
+      out.push(it);
+    }
+  }
+  return out;
 }
