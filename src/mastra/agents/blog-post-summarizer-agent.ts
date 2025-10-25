@@ -1,6 +1,6 @@
 import { blogSummaryPrompt } from "@lib/prompts/blog-summary-prompt";
 import { Agent } from "@mastra/core/agent";
-import { stagehandHarvestRecentPostsTool } from "@mastra/tools/blog/stagehand-harvest-recent-posts";
+import { stagehandHarvestRecentPostsTool } from "@mastra/tools/stagehand-harvest-recent-posts";
 import {
   createAnswerRelevancyScorer,
   createHallucinationScorer,

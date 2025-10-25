@@ -31,7 +31,7 @@
  */
 
 import { Page } from "@browserbasehq/stagehand";
-import { sessionManager } from "@lib/stagehand";
+import { sessionManager } from "@lib/services/stagehand";
 import { createTool } from "@mastra/core";
 import { z } from "zod/v3";
 
