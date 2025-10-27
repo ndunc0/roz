@@ -3,10 +3,11 @@ import { PinoLogger } from "@mastra/loggers";
 import { LibSQLStore } from "@mastra/libsql";
 import { blogPostSummarizerAgent } from "./agents/blog-post-summarizer-agent";
 import { digestWorkflow } from "./workflows/digest-workflow";
+import { linkedInUpdatesAgent } from "./agents/linkedin-updates-agent";
 
 export const mastra = new Mastra({
   workflows: { digestWorkflow },
-  agents: { blogPostSummarizerAgent },
+  agents: { blogPostSummarizerAgent, linkedInUpdatesAgent },
   storage: new LibSQLStore({
     // stores observability, scores, ... into memory storage, if it needs to persist, change to file:../mastra.db
     url: ":memory:",
