@@ -8,7 +8,7 @@ export const linkedInUpdatesAgent = new Agent({
   description:
     "Analyzes recent LinkedIn posts from a company to identify and summarize the most significant updates, announcements, and strategic insights.",
   instructions: linkedInUpdatesPrompt,
-  model: "google/gemini-2.5-flash-lite",
+  model: "anthropic/claude-haiku-4-5",
   tools: {
     brightdataFetchLinkedInPosts: brightdataFetchLinkedInPostsTool,
     brightdataPollSnapshot: brightdataPollSnapshotTool,

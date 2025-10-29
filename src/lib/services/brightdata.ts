@@ -137,10 +137,6 @@ export const downloadSnapshot = async (
     }
 
     const rawText = await response.text();
-    console.log(
-      "Downloaded snapshot (first 500 chars):",
-      rawText.substring(0, 500)
-    );
 
     // Try to parse as JSON
     const data = parseJSONorJSONL(rawText);
@@ -207,7 +203,6 @@ export const fetchCompanyLinkedInPosts = async ({
 
     // Get the raw text first to inspect it
     const rawText = await response.text();
-    console.log("Raw response (first 500 chars):", rawText.substring(0, 500));
 
     // Handle 202 - request is still in progress
     if (response.status === 202) {
@@ -233,7 +228,6 @@ export const fetchCompanyLinkedInPosts = async ({
     // Try to parse as JSON
     const data = parseJSONorJSONL(rawText);
 
-    console.log("Parsed data:", JSON.stringify(data).substring(0, 500));
     return data;
   } catch (error) {
     console.error("Error fetching LinkedIn posts:", error);
