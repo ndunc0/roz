@@ -11,7 +11,7 @@ export const blogPostSummarizerAgent = new Agent({
   description:
     "Summarizes recent blog posts into concise overviews highlighting key points for busy readers.",
   instructions: blogSummaryPrompt,
-  model: "google/gemini-2.5-flash-lite", // TODO: maybe actually update THIS one to Sonnet 4.5 (or Haiku 4.5)
+  model: "anthropic/claude-haiku-4-5",
   tools: {
     stagehandHarvestRecentPosts: stagehandHarvestRecentPostsTool,
   },
