@@ -29,6 +29,7 @@
   "devDependencies": {
     "@types/node": "^24.7.2",
     "mastra": "^0.15.1",
+    "supabase": "^2.54.11",
     "typescript": "^5.9.3"
   }
 }
