@@ -1,0 +1,14 @@
+{
+  "name": "@repo/db",
+  "type": "module",
+  "scripts": {
+    "dev": "tsc --watch",
+    "build": "tsc"
+  },
+  "dependencies": {
+    "supabase": "^2.54.11"
+  },
+  "devDependencies": {
+    "typescript": "latest"
+  }
+}

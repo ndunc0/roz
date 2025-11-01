@@ -9,10 +9,12 @@
     "skipLibCheck": true,
     "noEmit": true,
     "outDir": "dist",
+    "rootDir": "src",
     "paths": {
       "@mastra/*": ["./src/mastra/*"],
       "@lib/*": ["./src/lib/*"]
     }
   },
-  "include": ["src/**/*"]
+  "include": ["src/**/*"],
+  "exclude": ["node_modules"]
 }
