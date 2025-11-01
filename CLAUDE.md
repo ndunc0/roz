@@ -103,6 +103,7 @@ AI agents with specific responsibilities:
 - `blog-post-summarizer-agent.ts` - Summarizes blog posts
 - `linkedin-updates-agent.ts` - Summarizes LinkedIn posts
 - `content-judge-agent.ts` - Analyzes summaries, scores topics by significance (1-10), ranks them, and outputs structured JSON for downstream processing
+- `card-writer-agent.ts` - Transforms curated topics into polished weekly digest cards with headline and 1-6 bullet points (typically 3), enforcing 160-character limit per bullet
 
 Each agent has:
 - **name**: Unique identifier
@@ -118,7 +119,8 @@ Multi-step orchestration pipelines built with `createWorkflow()`:
   1. Runs `getBlogUpdatesStep` and `getLinkedInUpdatesStep` in parallel
   2. Maps results to combine blog and LinkedIn summaries
   3. Runs `judgeContentStep` to curate topics
-  4. Returns curated topics ready for email generation
+  4. Runs `createWeeklyCardStep` to generate polished digest card
+  5. Returns curated topics and weekly card object ready for database insertion
 
 Workflows use:
 - `inputSchema` and `outputSchema` (Zod schemas)
@@ -146,22 +148,37 @@ Central registration point:
 ```typescript
 export const mastra = new Mastra({
   workflows: { digestWorkflow },
-  agents: { blogPostSummarizerAgent, contentJudgeAgent, linkedInUpdatesAgent },
+  agents: {
+    blogPostSummarizerAgent,
+    contentJudgeAgent,
+    cardWriterAgent,
+    linkedInUpdatesAgent
+  },
   storage: new LibSQLStore({ url: ":memory:" }),  // In-memory for dev
   logger: new PinoLogger({ name: "Mastra", level: "info" }),
   observability: { default: { enabled: true } },
 });
 ```
 
-#### Key Services (`apps/harvester/src/lib/services/`)
+#### Key Services & Utilities (`apps/harvester/src/lib/`)
+
+**Services** (`services/`):
 - `stagehand.ts` - Session manager for Stagehand browser automation
 - `brightdata.ts` - BrightData API client
+
+**Utilities** (`utils.ts`):
+- `parseJsonFromLLM()` - Strips markdown code fences from LLM JSON output
+- `parseJSONorJSONL()` - Parses JSON or JSONL format with fallback
+- `getWeekId()` - Generates ISO 8601 week identifiers (e.g., "2025-W44")
+- `formatWeekIdForHumans()` - Converts week IDs to readable format (e.g., "Oct 27")
 
 #### Schemas (`apps/harvester/src/lib/schemas/`)
 Zod schemas for type safety and validation:
 - `workflow-schemas.ts` - Core workflow input/output schemas
-  - `CompanyInfoSchema`: `{ companyName, blogUrl, linkedInUrl }`
+  - `CompanyInfoSchema`: `{ companyId, companyName, blogUrl, linkedInUrl }`
   - `JudgeContentInputSchema`: Extends CompanyInfoSchema with summaries
+  - `CreateWeeklyCardInputSchema`: `{ companyId, companyName, weekId, curatedTopics }`
+  - `WeeklyCardOutputSchema`: Complete card object with card_id, headline, bullets, metadata
 - `brightdata-schemas.ts` - BrightData API request/response schemas
 
 ### Packages: Supabase
@@ -185,7 +202,7 @@ Database package containing schema migrations and generated TypeScript types. Se
 
 The typical flow for generating a company digest:
 
-1. **Input**: Company info (`companyName`, `blogUrl`, `linkedInUrl`)
+1. **Input**: Company info (`companyId`, `companyName`, `blogUrl`, `linkedInUrl`)
 
 2. **Parallel Content Collection**:
    - `getBlogUpdatesStep`: Uses `blogPostSummarizerAgent` to summarize recent blog posts
@@ -199,7 +216,18 @@ The typical flow for generating a company digest:
      - Recommend coverage level (HIGH/MEDIUM/LOW/SKIP)
      - Output structured JSON with ranked topics
 
-4. **Output**: Curated topics ready for final email generation (not yet implemented)
+4. **Card Generation**:
+   - `createWeeklyCardStep`: Uses `cardWriterAgent` to:
+     - Transform curated topics into a polished weekly card
+     - Generate headline (60-100 chars) connecting themes with "+"
+     - Create 1-6 bullet points (typically 3) based on week's activity
+     - Enforce 160-character limit per bullet
+     - Generate deterministic `card_id` from `company_id` + `week_id`
+     - Include metadata (significance_max, coverage_top, source_context)
+
+5. **Output**:
+   - `curatedTopics`: JSON string with ranked topics
+   - `weeklyCard`: Complete card object ready for database insertion into `company_weekly_card` table
 
 ## Development Patterns
 
@@ -233,7 +261,8 @@ The typical flow for generating a company digest:
 ### Mastra Agent Instructions
 - Prompts should be **detailed and explicit** - agents follow instructions literally
 - Use structured output formats (like JSON) when downstream processing is needed
-- The `content-judge-agent` outputs pure JSON (no markdown fences) for parsing
+- The `content-judge-agent` and `card-writer-agent` output pure JSON (no markdown fences) for parsing
+- Use `parseJsonFromLLM()` utility to safely parse LLM output and strip markdown code fences if present
 
 ### Stagehand Tool Limitations
 - **Only searches first page** of blog listings - no pagination
