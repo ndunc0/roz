@@ -1,5 +1,5 @@
 {
-  "name": "@repo/db",
+  "name": "@roz/db",
   "type": "module",
   "scripts": {
     "dev": "tsc --watch",
