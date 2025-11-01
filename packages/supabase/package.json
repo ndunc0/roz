@@ -1,14 +1,21 @@
 {
   "name": "@roz/supabase",
-  "type": "module",
+  "private": true,
   "scripts": {
-    "dev": "tsc --watch",
-    "build": "tsc"
+    "build": "tsc",
+    "dev": "tsc --watch"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.78.0",
     "supabase": "^2.54.11"
   },
   "devDependencies": {
     "typescript": "latest"
+  },
+  "exports": {
+    "./types": {
+      "types": "./dist/types/index.d.ts",
+      "default": "./dist/types/index.js"
+    }
   }
 }
