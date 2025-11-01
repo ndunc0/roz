@@ -1,5 +1,5 @@
 {
-  "name": "@roz/db",
+  "name": "@roz/supabase",
   "type": "module",
   "scripts": {
     "dev": "tsc --watch",
