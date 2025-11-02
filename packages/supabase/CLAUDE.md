@@ -9,6 +9,8 @@ packages/supabase/
 ├── config.toml           # Supabase local dev configuration
 ├── migrations/           # SQL migration files (timestamped)
 ├── src/
+│   ├── client.ts         # Supabase client instance
+│   ├── index.ts          # Main package exports (client + types)
 │   └── types/
 │       ├── database.types.ts  # Auto-generated Supabase types
 │       └── index.ts           # Re-exports all types
@@ -143,12 +145,41 @@ type CompanyInsert = TablesInsert<'company'>;
 
 ```json
 {
+  ".": {
+    "types": "./dist/index.d.ts",
+    "default": "./dist/index.js"
+  },
   "./types": {
     "types": "./dist/types/index.d.ts",
     "default": "./dist/types/index.js"
   }
 }
 ```
+
+### Using the Supabase Client
+
+Import the pre-configured Supabase client:
+
+```typescript
+import { supabase } from '@roz/supabase';
+import type { TablesInsert } from '@roz/supabase/types';
+
+// Example: Insert a company weekly card
+const cardData: TablesInsert<'company_weekly_card'> = {
+  card_id: 'factory-ai__2025-W44',
+  company_id: 'factory-ai',
+  week_id: '2025-W44',
+  headline: 'New partnership + product launch',
+  bullets_json: ['• Partnership — ...', '• Product — ...'],
+  // ...
+};
+
+const { data, error } = await supabase
+  .from('company_weekly_card')
+  .insert(cardData);
+```
+
+**Important**: The database uses **snake_case** column names (e.g., `card_id`, `company_id`), while the application layer uses **camelCase** (e.g., `cardId`, `companyId`). Always convert between these naming conventions when interfacing with the database.
 
 ## Seeding the Database
 

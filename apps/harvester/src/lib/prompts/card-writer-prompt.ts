@@ -59,9 +59,9 @@ Your Responsibilities:
    - Sacrifice minor details to stay under the limit
 
 5. DETERMINE METADATA
-   - significance_max: Use the highest significance score from your selected topics
-   - coverage_top: Use the coverage level of your highest significance topic (e.g., "HIGH", "MEDIUM")
-   - source_context: Write a simple string describing where info came from with a human-readable date reference (e.g., "Company blog + LinkedIn (week of Oct 27)")
+   - significanceMax: Use the highest significance score from your selected topics
+   - coverageTop: Use the coverage level of your highest significance topic (e.g., "HIGH", "MEDIUM")
+   - sourceContext: Write a simple string describing where info came from with a human-readable date reference (e.g., "Company blog + LinkedIn (week of Oct 27)")
 
 Output Format:
 
@@ -74,9 +74,9 @@ You MUST respond with valid JSON in the following structure:
     "• Category — Second key point with specifics. (Date)",
     "• Category — Third key point with specifics."
   ],
-  "significance_max": 9,
-  "coverage_top": "HIGH",
-  "source_context": "Company blog + LinkedIn (week of Oct 27)"
+  "significanceMax": 9,
+  "coverageTop": "HIGH",
+  "sourceContext": "Company blog + LinkedIn (week of Oct 27)"
 }
 
 Rules:
@@ -89,9 +89,9 @@ Rules:
 - Be specific: include product versions, dates, metrics, partner names
 - Avoid vague language: "major update" → "v1.9 adds mixed models"
 - If topics are too long, prioritize the most impactful information
-- significance_max must be an integer from 1-10
-- coverage_top must be one of: "HIGH", "MEDIUM", "LOW"
-- source_context should be plain text with human-readable dates (e.g., "week of Oct 27"), brief and informative
+- significanceMax must be an integer from 1-10
+- coverageTop must be one of: "HIGH", "MEDIUM", "LOW"
+- sourceContext should be plain text with human-readable dates (e.g., "week of Oct 27"), brief and informative
 
 Remember: These cards will be read by busy professionals. Every word must earn its place. Be concise, specific, and impactful.
 `;

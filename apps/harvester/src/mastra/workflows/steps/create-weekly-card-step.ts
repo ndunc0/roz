@@ -14,7 +14,7 @@ export const createWeeklyCardStep = createStep({
   execute: async ({ inputData }) => {
     const { companyId, companyName, weekId, curatedTopics } = inputData;
 
-    // Generate deterministic card_id from company_id + week_id
+    // Generate deterministic cardId from companyId + weekId
     const cardId = `${companyId}__${weekId}`;
 
     // Convert week ID to human-readable format (e.g., "2025-W44" → "Oct 27")
@@ -32,7 +32,7 @@ Please create a headline and 1-6 bullet points (typically 3) that capture the mo
 - Headline should use "+" to connect themes
 - Each bullet must be ≤ 160 characters including the "• " prefix
 - Be specific with facts, dates, and metrics
-- In source_context, use the format "Company blog + LinkedIn (week of ${weekDate})" or similar human-readable phrasing
+- In sourceContext, use the format "Company blog + LinkedIn (week of ${weekDate})" or similar human-readable phrasing
 - Output valid JSON only (no markdown, no explanatory text)`;
 
     const { text } = await cardWriterAgent.generate([
@@ -50,8 +50,8 @@ Please create a headline and 1-6 bullet points (typically 3) that capture the mo
       !Array.isArray(cardData.bullets) ||
       cardData.bullets.length < 1 ||
       cardData.bullets.length > 6 ||
-      typeof cardData.significance_max !== "number" ||
-      !cardData.coverage_top
+      typeof cardData.significanceMax !== "number" ||
+      !cardData.coverageTop
     ) {
       throw new Error(
         `Invalid card data structure from agent (expected 1-6 bullets): ${JSON.stringify(cardData)}`
@@ -71,18 +71,18 @@ Please create a headline and 1-6 bullet points (typically 3) that capture the mo
       }
     }
 
-    // Construct the complete weekly card object
+    // Construct the complete weekly card object (LLM returns camelCase)
     return {
       curatedTopics, // Pass through for workflow output
-      card_id: cardId,
-      company_id: companyId,
-      week_id: weekId,
+      cardId,
+      companyId,
+      weekId,
       version: 1,
       headline: cardData.headline,
-      bullets_json: cardData.bullets,
-      significance_max: cardData.significance_max,
-      coverage_top: cardData.coverage_top,
-      source_context: cardData.source_context || null,
+      bulletsJson: cardData.bullets,
+      significanceMax: cardData.significanceMax,
+      coverageTop: cardData.coverageTop,
+      sourceContext: cardData.sourceContext || null,
     };
   },
 });

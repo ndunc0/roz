@@ -104,6 +104,7 @@ AI agents with specific responsibilities:
 - `linkedin-updates-agent.ts` - Summarizes LinkedIn posts
 - `content-judge-agent.ts` - Analyzes summaries, scores topics by significance (1-10), ranks them, and outputs structured JSON for downstream processing
 - `card-writer-agent.ts` - Transforms curated topics into polished weekly digest cards with headline and 1-6 bullet points (typically 3), enforcing 160-character limit per bullet
+- `card-validator-agent.ts` - Quality assurance agent that validates cards before upload; checks structural compliance, content quality, factual accuracy, and editorial judgment; decides to APPROVE, REVISE_CARD, or RESTART_WORKFLOW
 
 Each agent has:
 - **name**: Unique identifier
@@ -119,12 +120,19 @@ Multi-step orchestration pipelines built with `createWorkflow()`:
   1. Runs `getBlogUpdatesStep` and `getLinkedInUpdatesStep` in parallel
   2. Maps results to combine blog and LinkedIn summaries
   3. Runs `judgeContentStep` to curate topics
-  4. Runs `createWeeklyCardStep` to generate polished digest card
-  5. Returns curated topics and weekly card object ready for database insertion
+  4. Loops `createAndValidateCardWorkflow` (up to 5 times) until card is approved
+  5. Uploads approved card to Supabase via `uploadCardStep`
+  6. Returns success status, curated topics, and weekly card object
+
+- `create-and-validate-card-workflow.ts` - Nested workflow that:
+  1. Runs `createWeeklyCardStep` to generate card
+  2. Runs `validateCardStep` to check quality
+  3. Returns validation result + card data
 
 Workflows use:
 - `inputSchema` and `outputSchema` (Zod schemas)
 - `.parallel([step1, step2])` - Run steps concurrently
+- `.dountil(step, condition)` - Loop step until condition is met
 - `.map(async fn => ...)` - Transform data between steps
 - `.then(nextStep)` - Sequential step
 - `.commit()` - Finalize workflow
@@ -173,13 +181,19 @@ export const mastra = new Mastra({
 - `formatWeekIdForHumans()` - Converts week IDs to readable format (e.g., "Oct 27")
 
 #### Schemas (`apps/harvester/src/lib/schemas/`)
-Zod schemas for type safety and validation:
+Zod schemas for type safety and validation (all use **camelCase** field names):
 - `workflow-schemas.ts` - Core workflow input/output schemas
   - `CompanyInfoSchema`: `{ companyId, companyName, blogUrl, linkedInUrl }`
   - `JudgeContentInputSchema`: Extends CompanyInfoSchema with summaries
   - `CreateWeeklyCardInputSchema`: `{ companyId, companyName, weekId, curatedTopics }`
-  - `WeeklyCardOutputSchema`: Complete card object with card_id, headline, bullets, metadata
+  - `WeeklyCardOutputSchema`: Complete card object with `cardId`, `headline`, `bulletsJson`, etc.
+  - `WeeklyCardDataSchema`: Card data without `curatedTopics` field
+  - `CardValidationResultSchema`: Validation result structure
+  - `ValidatedCardOutputSchema`: Combined validation + card data
+  - `DigestWorkflowOutputSchema`: Final digest workflow output
 - `brightdata-schemas.ts` - BrightData API request/response schemas
+
+**Important**: All application schemas use **camelCase** field names (e.g., `cardId`, `companyId`, `weekId`). When interfacing with the database, fields are converted to **snake_case** (e.g., `card_id`, `company_id`, `week_id`) to match database column names.
 
 ### Packages: Supabase
 
@@ -216,18 +230,37 @@ The typical flow for generating a company digest:
      - Recommend coverage level (HIGH/MEDIUM/LOW/SKIP)
      - Output structured JSON with ranked topics
 
-4. **Card Generation**:
+4. **Card Generation & Validation Loop** (up to 5 iterations):
    - `createWeeklyCardStep`: Uses `cardWriterAgent` to:
      - Transform curated topics into a polished weekly card
      - Generate headline (60-100 chars) connecting themes with "+"
      - Create 1-6 bullet points (typically 3) based on week's activity
      - Enforce 160-character limit per bullet
-     - Generate deterministic `card_id` from `company_id` + `week_id`
-     - Include metadata (significance_max, coverage_top, source_context)
+     - Generate deterministic `cardId` from `companyId` + `weekId`
+     - Include metadata (`significanceMax`, `coverageTop`, `sourceContext`)
+     - Output uses **camelCase** field names
+   - `validateCardStep`: Uses `cardValidatorAgent` to:
+     - Check structural compliance (headline length, bullet count, character limits)
+     - Verify content quality (specific, compelling, professional)
+     - Ensure factual accuracy (info matches curated topics)
+     - Assess editorial judgment (captures most newsworthy info)
+     - Decide: APPROVE, REVISE_CARD, or RESTART_WORKFLOW
+   - If REVISE_CARD: Loop back to `createWeeklyCardStep` (max 5 times)
+   - If RESTART_WORKFLOW: Throw error (manual intervention required)
+   - If APPROVE: Proceed to upload
 
-5. **Output**:
+5. **Upload to Database**:
+   - `uploadCardStep`: Inserts approved card into Supabase
+     - Converts camelCase fields to snake_case for database
+     - Inserts into `company_weekly_card` table
+     - Returns success status and card metadata
+
+6. **Output**:
+   - `success`: Boolean indicating upload success
+   - `cardId`: Uploaded card identifier
+   - `message`: Success message
    - `curatedTopics`: JSON string with ranked topics
-   - `weeklyCard`: Complete card object ready for database insertion into `company_weekly_card` table
+   - `weeklyCard`: Complete card object (camelCase format)
 
 ## Development Patterns
 
@@ -263,6 +296,7 @@ The typical flow for generating a company digest:
 - Use structured output formats (like JSON) when downstream processing is needed
 - The `content-judge-agent` and `card-writer-agent` output pure JSON (no markdown fences) for parsing
 - Use `parseJsonFromLLM()` utility to safely parse LLM output and strip markdown code fences if present
+- All agents return **camelCase** field names in JSON output to match application conventions
 
 ### Stagehand Tool Limitations
 - **Only searches first page** of blog listings - no pagination
