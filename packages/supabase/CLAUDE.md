@@ -150,6 +150,42 @@ type CompanyInsert = TablesInsert<'company'>;
 }
 ```
 
+## Seeding the Database
+
+For local development, seed data is provided in `supabase/seed/seed.sql`.
+
+### Seed Data Includes
+- **User**: nduncan@mba2026.hbs.edu (password: `password123`)
+  - User ID: `f7b3c3e0-9f0a-4b5e-8d3c-1a2b3c4d5e6f`
+- **Companies**: 3 companies
+  - Factory AI (`factory-ai`) - https://factory.ai
+  - Juicebox (`juicebox`) - https://juicebox.ai
+  - OpenAI (`openai`) - https://openai.com
+- **Follows**: User automatically follows all 3 companies
+
+### Running Seeds
+
+**Recommended method** (auto-runs on db reset):
+```bash
+cd packages/supabase
+supabase db reset
+```
+
+**Manual method** (run seed file directly):
+```bash
+psql -U postgres -d postgres -h localhost -p 54322 -f seed.sql
+```
+
+### Customizing Seed Data
+To add more companies or modify existing ones, edit `supabase/seed/seed.sql` and update the company records with:
+- Company ID (e.g., `anthropic`, `openai`) - kebab-case slug
+- Company name
+- Website URL
+- LinkedIn profile URL
+- Blog URL
+
+Then run `supabase db reset` to apply the changes.
+
 ## Important Notes
 
 1. **Type Generation**: To regenerate types after schema changes, use the Supabase CLI
@@ -162,6 +198,5 @@ type CompanyInsert = TablesInsert<'company'>;
 
 - [ ] Add Row Level Security (RLS) policies
 - [ ] Consider adding indexes for common queries
-- [ ] Add seed data for local development
 - [ ] Consider adding database functions for common operations
 - [ ] Add enum types if needed for fixed value sets
