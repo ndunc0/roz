@@ -18,6 +18,7 @@
     "node": ">=20.9.0"
   },
   "dependencies": {
+    "@roz/models": "*",
     "@roz/supabase": "*",
     "@browserbasehq/stagehand": "^2.5.2",
     "@mastra/core": "^0.22.0",
