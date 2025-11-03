@@ -135,6 +135,11 @@ export function getWeekId(
  * ```
  */
 export function formatWeekIdForHumans(weekId: string): string {
+  // Guard against undefined/null input
+  if (!weekId) {
+    throw new Error(`Week ID is required but received: ${weekId}`);
+  }
+
   // Parse the ISO week ID (e.g., "2025-W44")
   const match = weekId.match(/^(\d{4})-W(\d{2})$/);
   if (!match) {

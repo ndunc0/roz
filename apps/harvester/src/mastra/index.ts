@@ -7,9 +7,10 @@ import { cardWriterAgent } from "./agents/card-writer-agent";
 import { cardValidatorAgent } from "./agents/card-validator-agent";
 import { digestWorkflow } from "./workflows/digest-workflow";
 import { linkedInUpdatesAgent } from "./agents/linkedin-updates-agent";
+import { createAndValidateCardWorkflow } from "./workflows/create-and-validate-card-workflow";
 
 export const mastra = new Mastra({
-  workflows: { digestWorkflow },
+  workflows: { digestWorkflow, createAndValidateCardWorkflow },
   agents: {
     blogPostSummarizerAgent,
     contentJudgeAgent,

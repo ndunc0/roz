@@ -12,7 +12,14 @@ export const createWeeklyCardStep = createStep({
   inputSchema: CreateWeeklyCardInputSchema,
   outputSchema: WeeklyCardOutputSchema,
   execute: async ({ inputData }) => {
-    const { companyId, companyName, weekId, curatedTopics } = inputData;
+    const {
+      companyId,
+      companyName,
+      weekId,
+      curatedTopics,
+      validationFeedback,
+      previousCardData,
+    } = inputData;
 
     // Generate deterministic cardId from companyId + weekId
     const cardId = `${companyId}__${weekId}`;
@@ -20,11 +27,33 @@ export const createWeeklyCardStep = createStep({
     // Convert week ID to human-readable format (e.g., "2025-W44" → "Oct 27")
     const weekDate = formatWeekIdForHumans(weekId);
 
-    const prompt = `You are creating a weekly digest card for ${companyName} for the week of ${weekDate}.
+    // Build the base prompt
+    let prompt = `You are creating a weekly digest card for ${companyName} for the week of ${weekDate}.
 
 Here are the curated topics from the editorial judge:
 
-${curatedTopics}
+${curatedTopics}`;
+
+    // If this is a retry, include validation feedback and previous attempt
+    if (validationFeedback && previousCardData) {
+      prompt += `
+
+⚠️ IMPORTANT - THIS IS A RETRY ATTEMPT:
+Your previous card was rejected by the validator. Here's what you created before:
+
+PREVIOUS HEADLINE:
+${previousCardData.headline}
+
+PREVIOUS BULLETS:
+${previousCardData.bulletsJson.map((b, i) => `${i + 1}. ${b} (${b.length} chars)`).join("\n")}
+
+VALIDATION FEEDBACK:
+${validationFeedback}
+
+Please fix the issues mentioned above and create an improved version.`;
+    }
+
+    prompt += `
 
 Please create a headline and 1-6 bullet points (typically 3) that capture the most significant updates from this week. Remember:
 - This card covers the past 7 days of blog and LinkedIn activity (week of ${weekDate})
@@ -58,24 +87,12 @@ Please create a headline and 1-6 bullet points (typically 3) that capture the mo
       );
     }
 
-    // Validate bullet lengths (max 160 characters)
-    for (const bullet of cardData.bullets) {
-      if (bullet.length > 160) {
-        console.warn(
-          `Bullet exceeds 160 characters (${bullet.length}): "${bullet}"`
-        );
-        // Truncate if needed
-        cardData.bullets[cardData.bullets.indexOf(bullet)] = bullet
-          .substring(0, 157)
-          .concat("...");
-      }
-    }
-
     // Construct the complete weekly card object (LLM returns camelCase)
     return {
       curatedTopics, // Pass through for workflow output
       cardId,
       companyId,
+      companyName, // Pass through for retries in dountil loops
       weekId,
       version: 1,
       headline: cardData.headline,

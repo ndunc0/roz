@@ -1,38 +1,12 @@
 import { createStep } from "@mastra/core/workflows";
-import { z } from "zod";
-import { supabase } from "@roz/supabase";
-import type { TablesInsert } from "@roz/supabase/types";
-
-const UploadCardInputSchema = z.object({
-  cardId: z.string(),
-  companyId: z.string(),
-  weekId: z.string(),
-  version: z.number(),
-  headline: z.string(),
-  bulletsJson: z.array(z.string()),
-  significanceMax: z.number(),
-  coverageTop: z.string(),
-  sourceContext: z.string().nullable(),
-  curatedTopics: z.string(),
-});
-
-const UploadCardOutputSchema = z.object({
-  success: z.boolean(),
-  cardId: z.string(),
-  message: z.string(),
-  curatedTopics: z.string(),
-  weeklyCard: z.object({
-    cardId: z.string(),
-    companyId: z.string(),
-    weekId: z.string(),
-    version: z.number(),
-    headline: z.string(),
-    bulletsJson: z.array(z.string()),
-    significanceMax: z.number(),
-    coverageTop: z.string(),
-    sourceContext: z.string().nullable(),
-  }),
-});
+import {
+  createCompanyWeeklyCard,
+  type CompanyWeeklyCardInsert,
+} from "@roz/models";
+import {
+  UploadCardInputSchema,
+  UploadCardOutputSchema,
+} from "@lib/schemas/workflow-schemas";
 
 export const uploadCardStep = createStep({
   id: "upload-card-step",
@@ -42,8 +16,8 @@ export const uploadCardStep = createStep({
     const { curatedTopics, ...cardData } = inputData;
 
     // Prepare the insert data for Supabase (convert camelCase to snake_case for database)
-    const insertData: TablesInsert<"company_weekly_card"> = {
-      card_id: cardData.cardId,
+    // NOTE: card_id is a GENERATED column (company_id || '__' || week_id) and should NOT be included
+    const insertData: CompanyWeeklyCardInsert = {
       company_id: cardData.companyId,
       week_id: cardData.weekId,
       version: cardData.version,
@@ -54,21 +28,13 @@ export const uploadCardStep = createStep({
       source_context: cardData.sourceContext,
     };
 
-    console.log("Uploading card to Supabase:", insertData.card_id);
+    console.log(
+      "Uploading card to Supabase:",
+      `${insertData.company_id}__${insertData.week_id}`
+    );
 
     try {
-      // Insert the card into the database
-      const { data, error } = await supabase
-        .from("company_weekly_card")
-        .insert(insertData)
-        .select()
-        .single();
-
-      if (error) {
-        throw new Error(
-          `Failed to upload card to Supabase: ${error.message} (${error.code ?? "UNKNOWN"})`
-        );
-      }
+      const data = await createCompanyWeeklyCard(insertData);
 
       console.log("Successfully uploaded card to Supabase:", data.card_id);
 

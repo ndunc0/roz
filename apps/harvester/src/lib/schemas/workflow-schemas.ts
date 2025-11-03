@@ -28,24 +28,31 @@ export const CreateWeeklyCardInputSchema = z.object({
   companyName: z.string(),
   weekId: z.string(),
   curatedTopics: z.string(), // JSON string from judge agent
+  // Optional validation feedback from previous iteration (for retries in dountil loops)
+  validationFeedback: z.string().optional(),
+  previousCardData: z
+    .object({
+      headline: z.string(),
+      bulletsJson: z.array(z.string()),
+    })
+    .optional(),
 });
 
-export const WeeklyCardOutputSchema = z.object({
-  curatedTopics: z.string(), // Pass through from judge step
+export const WeeklyCardOutputSchema = CreateWeeklyCardInputSchema.extend({
   cardId: z.string(),
-  companyId: z.string(),
-  weekId: z.string(),
   version: z.number(),
   headline: z.string(),
   bulletsJson: z.array(z.string()),
   significanceMax: z.number(),
-  coverageTop: z.string(),
+  coverageTop: z.enum(["high", "medium", "low"]),
   sourceContext: z.string().nullable(),
 });
 
-// Card data without the curatedTopics field
+// Card data without the curatedTopics and companyName fields
+// (these are passed through for workflow retries but not needed in final card data)
 export const WeeklyCardDataSchema = WeeklyCardOutputSchema.omit({
   curatedTopics: true,
+  companyName: true,
 });
 
 // Validation result schema
@@ -57,19 +64,27 @@ export const CardValidationResultSchema = z.object({
 });
 
 // Combined validation result + card data for create-and-validate workflow output
-export const ValidatedCardOutputSchema = CardValidationResultSchema.extend({
+// IMPORTANT: Extends CreateWeeklyCardInputSchema to preserve all input fields (companyId, companyName, weekId, curatedTopics)
+// at the top level to ensure they're available when dountil loops back for retries (REVISE_CARD)
+export const ValidatedCardOutputSchema = CreateWeeklyCardInputSchema.merge(
+  CardValidationResultSchema
+).extend({
   weeklyCard: WeeklyCardOutputSchema,
 });
 
-// Digest workflow output schema
-export const DigestWorkflowOutputSchema = z.object({
+// Upload card step schemas
+// Input is the weekly card output minus companyName and optional validation fields
+export const UploadCardInputSchema = WeeklyCardOutputSchema.omit({
+  companyName: true,
+  validationFeedback: true,
+  previousCardData: true,
+});
+
+// Output includes success status, message, and the uploaded card data
+export const UploadCardOutputSchema = z.object({
   success: z.boolean(),
   cardId: z.string(),
   message: z.string(),
-  curatedTopics: z
-    .string()
-    .describe(
-      "Curated and ranked topics from blog and LinkedIn updates, ready for final email drafting"
-    ),
+  curatedTopics: z.string(),
   weeklyCard: WeeklyCardDataSchema,
 });

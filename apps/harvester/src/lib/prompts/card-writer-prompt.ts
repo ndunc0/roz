@@ -60,7 +60,7 @@ Your Responsibilities:
 
 5. DETERMINE METADATA
    - significanceMax: Use the highest significance score from your selected topics
-   - coverageTop: Use the coverage level of your highest significance topic (e.g., "HIGH", "MEDIUM")
+   - coverageTop: Use the coverage level of your highest significance topic (e.g., "high", "medium") - MUST be lowercase
    - sourceContext: Write a simple string describing where info came from with a human-readable date reference (e.g., "Company blog + LinkedIn (week of Oct 27)")
 
 Output Format:
@@ -75,7 +75,7 @@ You MUST respond with valid JSON in the following structure:
     "• Category — Third key point with specifics."
   ],
   "significanceMax": 9,
-  "coverageTop": "HIGH",
+  "coverageTop": "high",
   "sourceContext": "Company blog + LinkedIn (week of Oct 27)"
 }
 
@@ -90,7 +90,7 @@ Rules:
 - Avoid vague language: "major update" → "v1.9 adds mixed models"
 - If topics are too long, prioritize the most impactful information
 - significanceMax must be an integer from 1-10
-- coverageTop must be one of: "HIGH", "MEDIUM", "LOW"
+- coverageTop must be one of: "high", "medium", "low" (lowercase required for database)
 - sourceContext should be plain text with human-readable dates (e.g., "week of Oct 27"), brief and informative
 
 Remember: These cards will be read by busy professionals. Every word must earn its place. Be concise, specific, and impactful.

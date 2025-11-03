@@ -1,7 +1,7 @@
 import { createWorkflow } from "@mastra/core/workflows";
 import {
   CompanyInfoSchema,
-  DigestWorkflowOutputSchema,
+  UploadCardOutputSchema,
 } from "@lib/schemas/workflow-schemas";
 import { getBlogUpdatesStep } from "./steps/get-blog-updates-step";
 import { getLinkedInUpdatesStep } from "./steps/get-linkedin-updates-step";
@@ -15,7 +15,7 @@ const MAX_VALIDATION_ITERATIONS = 5;
 export const digestWorkflow = createWorkflow({
   id: "digest-workflow",
   inputSchema: CompanyInfoSchema,
-  outputSchema: DigestWorkflowOutputSchema,
+  outputSchema: UploadCardOutputSchema,
 })
   .parallel([getBlogUpdatesStep, getLinkedInUpdatesStep])
   .map(async ({ inputData, getInitData }) => {

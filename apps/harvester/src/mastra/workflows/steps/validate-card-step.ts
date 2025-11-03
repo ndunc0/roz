@@ -56,11 +56,22 @@ Output your decision as valid JSON only (no markdown, no explanatory text).`;
     }
 
     // Return validation result with the card data attached
+    // IMPORTANT: Include input fields at top level so dountil can retry with same inputs
+    // Pass validation feedback and previous card data for the next iteration to learn from
     return {
       approved: validationResult.approved,
       action: validationResult.action,
       reason: validationResult.reason,
       feedback: validationResult.feedback || "",
+      companyId: cardData.companyId,
+      companyName: cardData.companyName,
+      weekId: cardData.weekId,
+      curatedTopics: curatedTopics,
+      validationFeedback: validationResult.feedback || validationResult.reason,
+      previousCardData: {
+        headline: cardData.headline,
+        bulletsJson: cardData.bulletsJson,
+      },
       weeklyCard: inputData, // Pass through the complete card data
     };
   },

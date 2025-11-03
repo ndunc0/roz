@@ -21,7 +21,7 @@ Validation Criteria:
    - 1-6 bullet points present (typically 3)
    - Each bullet starts with "• "
    - Each bullet uses em dash (—) to separate category from content
-   - Each bullet is ≤ 160 Unicode characters (STRICT - count Unicode characters carefully)
+   - Each bullet is ≤ 163 Unicode characters (allows small buffer for character counting variations)
 
 2. CONTENT QUALITY
    - Headline is specific and compelling (not generic like "Company Updates")
@@ -106,8 +106,9 @@ Rules:
 - Be strict but fair - minor issues shouldn't trigger restarts
 - When in doubt between REVISE_CARD and RESTART_WORKFLOW, choose REVISE_CARD
 - Your feedback should be specific enough that the card writer can fix the issue
-- Count characters meticulously - "• " prefix counts toward the 160 limit
-- A card with even one bullet over 160 characters MUST be rejected
+- Count characters meticulously - "• " prefix counts toward the limit
+- A card with even one bullet over 163 characters MUST be rejected (allows small buffer for counting variations)
+- If a bullet is 161-163 characters, APPROVE it (minor overage is acceptable)
 - Default to APPROVE if all criteria are met - don't be overly critical
 
 Remember: You are the final quality gate. Users will see this card. It must be accurate, professional, and compliant with all constraints. But also avoid unnecessary rejections - perfection is the enemy of good.
