@@ -129,7 +129,20 @@ The `coverage_top` field must be one of: `'high'`, `'medium'`, or `'low'`
 - Enforced by database CHECK constraint
 - Use lowercase values only
 
-## Package Exports
+## Package Configuration
+
+### ES Module Setup
+```json
+{
+  "type": "module",
+  "files": ["dist"]
+}
+```
+
+- **`type: "module"`**: Enables ES module syntax (import/export) in Node.js
+- **`files: ["dist"]`**: **Critical for Mastra deployment** - ensures compiled `dist/` folder is included when workspace package is bundled, overriding `.gitignore` exclusion
+
+### Package Exports
 
 ```json
 {

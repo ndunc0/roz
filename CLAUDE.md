@@ -156,18 +156,65 @@ Reusable functions that can be attached to agents:
 Central registration point:
 ```typescript
 export const mastra = new Mastra({
-  workflows: { digestWorkflow },
+  workflows: { digestWorkflow, createAndValidateCardWorkflow },
   agents: {
     blogPostSummarizerAgent,
     contentJudgeAgent,
     cardWriterAgent,
+    cardValidatorAgent,
     linkedInUpdatesAgent
   },
   storage: new LibSQLStore({ url: ":memory:" }),  // In-memory for dev
   logger: new PinoLogger({ name: "Mastra", level: "info" }),
+  telemetry: { enabled: false },
   observability: { default: { enabled: true } },
+  bundler: {
+    transpilePackages: ["@roz/models", "@roz/supabase"],
+    sourcemap: true,
+  },
+  server: {
+    host: "0.0.0.0",
+    port: Number(process.env.PORT) || 8080,
+    timeout: 60 * 60 * 1000,  // 1 hour timeout for long-running workflows
+    apiRoutes: [
+      registerApiRoute("/workflows/harvester/run", {
+        method: "POST",
+        handler: async (c) => {
+          // Parse JSON body with proper error handling
+          let rawInput;
+          try {
+            rawInput = await c.req.json();
+          } catch (e) {
+            return c.json({ ok: false, error: "Invalid JSON" }, 400);
+          }
+
+          // Validate against workflow input schema
+          const parseResult = digestWorkflow.inputSchema.safeParse(rawInput);
+          if (!parseResult.success) {
+            return c.json({
+              ok: false,
+              error: "Invalid input payload",
+              issues: parseResult.error.flatten(),
+            }, 400);
+          }
+
+          // Execute workflow
+          const wf = c.get("mastra").getWorkflow("digestWorkflow");
+          const run = await wf.createRunAsync();
+          const result = await run.start({ inputData: parseResult.data });
+
+          return c.json({ ok: true, result });
+        },
+      }),
+    ],
+  },
 });
 ```
+
+**Important Configuration Notes**:
+- **bundler.transpilePackages**: Lists workspace packages (`@roz/models`, `@roz/supabase`) that need to be packaged for deployment. See "Monorepo Deployment Requirements" below.
+- **server.apiRoutes**: Custom API endpoints using `registerApiRoute()` from `@mastra/core/server`. Always parse JSON with try-catch and validate with Zod schemas.
+- **server.timeout**: Set to 1 hour to accommodate long-running digest workflows (blog scraping + LLM calls)
 
 #### Key Services & Utilities (`apps/harvester/src/lib/`)
 
@@ -348,8 +395,44 @@ The typical flow for generating a company digest:
 
 ### Turborepo Task Dependencies
 - `build` depends on `^build` (builds dependencies first)
+- **`dev` depends on `^build`** (builds workspace packages before starting dev server - **required for Mastra**)
 - Tasks cache by default except `dev` (persistent, no cache)
 - Global env loaded from `.env` at root
+
+### Monorepo Deployment Requirements
+
+When deploying the Mastra harvester app, workspace packages must be **pre-compiled to JavaScript** before Mastra bundles them. This is because Mastra's `transpilePackages` option packages workspace dependencies but expects compiled output, not TypeScript source.
+
+**Required Configuration**:
+
+1. **Add `files` field to workspace package.json** (both `@roz/models` and `@roz/supabase`):
+   ```json
+   {
+     "files": ["dist"]
+   }
+   ```
+   This ensures the compiled `dist/` folder is included when `npm pack` packages the workspace dependency, overriding `.gitignore` exclusion.
+
+2. **Build workspace packages before dev/build** (`turbo.json`):
+   ```json
+   {
+     "dev": {
+       "dependsOn": ["^build"],  // Build workspace packages first
+       "persistent": true,
+       "cache": false
+     }
+   }
+   ```
+
+3. **Configure Mastra bundler** (`apps/harvester/src/mastra/index.ts`):
+   ```typescript
+   bundler: {
+     transpilePackages: ["@roz/models", "@roz/supabase"],
+     sourcemap: true,
+   }
+   ```
+
+**Why This Works**: Mastra's build process uses `npm pack` to package workspace dependencies into `.mastra/output/node_modules/`. The `files` field ensures compiled JavaScript is included, and `transpilePackages` tells Mastra which packages to bundle into the deployment artifact.
 
 ### Environment Variables
 - `.env` files are gitignored

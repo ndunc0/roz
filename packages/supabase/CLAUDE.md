@@ -144,7 +144,44 @@ type CompanyInsert = TablesInsert<'company'>;
 - Extra search path: `public`, `extensions`
 - Max rows: 1000
 
-## Package Exports
+## Package Configuration
+
+### ES Module Setup
+```json
+{
+  "type": "module",
+  "files": ["dist"]
+}
+```
+
+- **`type: "module"`**: Enables ES module syntax (import/export) in Node.js
+- **`files: ["dist"]`**: **Critical for Mastra deployment** - ensures compiled `dist/` folder is included when workspace package is bundled, overriding `.gitignore` exclusion
+
+### TypeScript Configuration
+
+**Module Resolution for ES Modules**:
+```json
+{
+  "compilerOptions": {
+    "module": "Node16",
+    "moduleResolution": "Node16"
+  }
+}
+```
+
+- **`module: "Node16"`**: Generates Node.js-compatible ES modules
+- **`moduleResolution: "Node16"`**: Requires explicit `.js` extensions in imports (per Node.js ES module spec)
+
+**Important**: All relative imports in TypeScript source must include `.js` extensions:
+```typescript
+// ✅ Correct
+export * from './database.types.js';
+
+// ❌ Wrong (will fail at runtime with Node.js ES modules)
+export * from './database.types';
+```
+
+### Package Exports
 
 ```json
 {
