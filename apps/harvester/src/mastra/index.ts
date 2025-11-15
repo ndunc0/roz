@@ -41,6 +41,12 @@ export const mastra = new Mastra({
     port: Number(process.env.PORT) || 8080,
     timeout: 60 * 60 * 1000,
     apiRoutes: [
+      registerApiRoute("/health", {
+        method: "GET",
+        handler: async (c) => {
+          return c.json({ ok: true }, 200);
+        },
+      }),
       registerApiRoute("/workflows/harvester/run", {
         method: "POST",
         handler: async (c) => {

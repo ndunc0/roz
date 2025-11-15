@@ -1,0 +1,76 @@
+# Google Cloud Build configuration for Harvester deployment
+# Triggers on push to main branch or manual trigger
+
+steps:
+  # Step 1: Build the Docker image
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'build-image'
+    args:
+      - 'build'
+      - '-f'
+      - 'apps/harvester/Dockerfile'
+      - '-t'
+      - 'us-central1-docker.pkg.dev/$PROJECT_ID/harvester/app:$COMMIT_SHA'
+      - '-t'
+      - 'us-central1-docker.pkg.dev/$PROJECT_ID/harvester/app:latest'
+      - '.'
+    timeout: 1200s
+
+  # Step 2: Push the image to Artifact Registry
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'push-image'
+    args:
+      - 'push'
+      - '--all-tags'
+      - 'us-central1-docker.pkg.dev/$PROJECT_ID/harvester/app'
+    waitFor: ['build-image']
+
+  # Step 3: Deploy to Cloud Run
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    id: 'deploy-cloudrun'
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'deploy'
+      - 'harvester'
+      - '--image'
+      - 'us-central1-docker.pkg.dev/$PROJECT_ID/harvester/app:$COMMIT_SHA'
+      - '--region'
+      - 'us-central1'
+      - '--platform'
+      - 'managed'
+      - '--allow-unauthenticated'
+      - '--memory'
+      - '2Gi'
+      - '--cpu'
+      - '2'
+      - '--timeout'
+      - '3600'
+      - '--max-instances'
+      - '10'
+      - '--min-instances'
+      - '0'
+      - '--set-env-vars'
+      - 'NODE_ENV=production'
+      - '--update-secrets'
+      - 'OPENAI_API_KEY=openai-api-key:latest,SUPABASE_URL=supabase-url:latest,SUPABASE_ANON_KEY=supabase-anon-key:latest,SUPABASE_SERVICE_ROLE_KEY=supabase-service-role-key:latest,BRIGHTDATA_API_KEY=brightdata-api-key:latest,BROWSERBASE_API_KEY=browserbase-api-key:latest'
+    waitFor: ['push-image']
+
+# Store built images in Artifact Registry
+images:
+  - 'us-central1-docker.pkg.dev/$PROJECT_ID/harvester/app:$COMMIT_SHA'
+  - 'us-central1-docker.pkg.dev/$PROJECT_ID/harvester/app:latest'
+
+# Build options
+options:
+  # Use high-performance machine for faster builds
+  machineType: 'E2_HIGHCPU_8'
+  # Increase timeout for monorepo builds
+  timeout: '2400s'
+  # Enable Docker layer caching
+  logging: CLOUD_LOGGING_ONLY
+
+# Substitutions (can be overridden in trigger)
+substitutions:
+  _REGION: 'us-central1'
+  _SERVICE_NAME: 'harvester'

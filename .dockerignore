@@ -1,0 +1,44 @@
+# Dependencies
+node_modules
+npm-debug.log
+
+# Build outputs
+dist
+.next
+.turbo
+.mastra
+
+# Development files
+.env
+.env.local
+.env*.local
+
+# Git
+.git
+.gitignore
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Documentation
+README.md
+*.md
+
+# CI/CD
+.github
+
+# Supabase local
+packages/supabase/.supabase
+
+# Test files
+*.test.ts
+*.test.js
+*.spec.ts
+*.spec.js
